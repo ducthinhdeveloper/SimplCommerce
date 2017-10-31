@@ -76,6 +76,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
             {
                 Id = product.Id,
                 Name = product.Name,
+                Slug = product.SeoTitle,
                 ShortDescription = product.ShortDescription,
                 Description = product.Description,
                 Specification = product.Specification,
@@ -119,7 +120,8 @@ namespace SimplCommerce.Module.Catalog.Controllers
                 {
                     Id = x.OptionId,
                     Name = x.Option.Name,
-                    Values = JsonConvert.DeserializeObject<IList<string>>(x.Value)
+                    DisplayType = x.DisplayType,
+                    Values = JsonConvert.DeserializeObject<IList<ProductOptionValueVm>>(x.Value)
                 }).ToList();
 
             foreach (var variation in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Super).Select(x => x.LinkedProduct).Where(x => !x.IsDeleted).OrderBy(x => x.Id))
@@ -141,12 +143,23 @@ namespace SimplCommerce.Module.Catalog.Controllers
                 });
             }
 
-            foreach (var relatedProduct in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Relation).Select(x => x.LinkedProduct).Where(x => !x.IsDeleted).OrderBy(x => x.Id))
+            foreach (var relatedProduct in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Related).Select(x => x.LinkedProduct).Where(x => !x.IsDeleted).OrderBy(x => x.Id))
             {
-                productVm.RelatedProducts.Add(new RelatedProductVm
+                productVm.RelatedProducts.Add(new ProductLinkVm
                 {
                     Id = relatedProduct.Id,
-                    Name = relatedProduct.Name
+                    Name = relatedProduct.Name,
+                    IsPublished = relatedProduct.IsPublished
+                });
+            }
+
+            foreach (var crossSellProduct in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.CrossSell).Select(x => x.LinkedProduct).Where(x => !x.IsDeleted).OrderBy(x => x.Id))
+            {
+                productVm.CrossSellProducts.Add(new ProductLinkVm
+                {
+                    Id = crossSellProduct.Id,
+                    Name = crossSellProduct.Name,
+                    IsPublished = crossSellProduct.IsPublished
                 });
             }
 
@@ -247,7 +260,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
             var product = new Product
             {
                 Name = model.Product.Name,
-                SeoTitle = model.Product.Name.ToUrlFriendly(),
+                SeoTitle = model.Product.Slug,
                 ShortDescription = model.Product.ShortDescription,
                 Description = model.Product.Description,
                 Specification = model.Product.Specification,
@@ -286,6 +299,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
                 product.AddOptionValue(new ProductOptionValue
                 {
                     OptionId = option.Id,
+                    DisplayType = option.DisplayType,
                     Value = JsonConvert.SerializeObject(option.Values),
                     SortIndex = optionIndex
                 });
@@ -316,7 +330,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
             SaveProductMedias(model, product);
 
             MapProductVariationVmToProduct(model, product);
-            MapProductRelationVmToProduct(model, product);
+            MapProductLinkVmToProduct(model, product);
 
             _productService.Create(product);
 
@@ -347,7 +361,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
             }
 
             product.Name = model.Product.Name;
-            product.SeoTitle = product.Name.ToUrlFriendly();
+            product.SeoTitle = model.Product.Slug;
             product.ShortDescription = model.Product.ShortDescription;
             product.Description = model.Product.Description;
             product.Specification = model.Product.Specification;
@@ -385,7 +399,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
             AddOrDeleteProductAttribute(model, product);
             AddOrDeleteCategories(model, product);
             AddOrDeleteProductVariation(model, product);
-            AddOrDeleteProductRelation(model, product);
+            AddOrDeleteProductLinks(model, product);
 
             _productService.Update(product);
 
@@ -428,7 +442,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
                 return new BadRequestObjectResult(new { error = "You don't have permission to manage this product" });
             }
 
-            _productService.Delete(product);
+            await _productService.Delete(product);
 
             return Ok();
         }
@@ -468,15 +482,27 @@ namespace SimplCommerce.Module.Catalog.Controllers
             }
         }
 
-        private static void MapProductRelationVmToProduct(ProductForm model, Product product)
+        private static void MapProductLinkVmToProduct(ProductForm model, Product product)
         {
-            foreach (var relationVm in model.Product.RelatedProducts)
+            foreach (var relatedProductVm in model.Product.RelatedProducts)
             {
                 var productLink = new ProductLink
                 {
-                    LinkType = ProductLinkType.Relation,
+                    LinkType = ProductLinkType.Related,
                     Product = product,
-                    LinkedProductId = relationVm.Id
+                    LinkedProductId = relatedProductVm.Id
+                };
+
+                product.AddProductLinks(productLink);
+            }
+
+            foreach (var crossSellProductVm in model.Product.CrossSellProducts)
+            {
+                var productLink = new ProductLink
+                {
+                    LinkType = ProductLinkType.CrossSell,
+                    Product = product,
+                    LinkedProductId = crossSellProductVm.Id
                 };
 
                 product.AddProductLinks(productLink);
@@ -522,6 +548,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
                     product.AddOptionValue(new ProductOptionValue
                     {
                         OptionId = optionVm.Id,
+                        DisplayType = optionVm.DisplayType,
                         Value = JsonConvert.SerializeObject(optionVm.Values),
                         SortIndex = optionIndex
                     });
@@ -529,6 +556,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
                 else
                 {
                     optionValue.Value = JsonConvert.SerializeObject(optionVm.Values);
+                    optionValue.DisplayType = optionVm.DisplayType;
                     optionValue.SortIndex = optionIndex;
                 }
 
@@ -597,27 +625,51 @@ namespace SimplCommerce.Module.Catalog.Controllers
         }
 
         // Due to some issue with EF Core, we have to use _productLinkRepository in this case.
-        private void AddOrDeleteProductRelation(ProductForm model, Product product)
+        private void AddOrDeleteProductLinks(ProductForm model, Product product)
         {
-            foreach (var productRelationVm in model.Product.RelatedProducts)
+            foreach (var relatedProductVm in model.Product.RelatedProducts)
             {
-                var productLink = product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Relation).FirstOrDefault(x => x.LinkedProductId == productRelationVm.Id);
+                var productLink = product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Related).FirstOrDefault(x => x.LinkedProductId == relatedProductVm.Id);
                 if (productLink == null)
                 {
                     productLink = new ProductLink
                     {
-                        LinkType = ProductLinkType.Relation,
+                        LinkType = ProductLinkType.Related,
                         Product = product,
-                        LinkedProductId = productRelationVm.Id,
+                        LinkedProductId = relatedProductVm.Id,
                     };
 
                     _productLinkRepository.Add(productLink);
                 }
             }
 
-            foreach (var productLink in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Relation))
+            foreach (var productLink in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.Related))
             {
                 if (model.Product.RelatedProducts.All(x => x.Id != productLink.LinkedProductId))
+                {
+                    _productLinkRepository.Remove(productLink);
+                }
+            }
+
+            foreach (var crossSellProductVm in model.Product.CrossSellProducts)
+            {
+                var productLink = product.ProductLinks.Where(x => x.LinkType == ProductLinkType.CrossSell).FirstOrDefault(x => x.LinkedProductId == crossSellProductVm.Id);
+                if (productLink == null)
+                {
+                    productLink = new ProductLink
+                    {
+                        LinkType = ProductLinkType.CrossSell,
+                        Product = product,
+                        LinkedProductId = crossSellProductVm.Id,
+                    };
+
+                    _productLinkRepository.Add(productLink);
+                }
+            }
+
+            foreach (var productLink in product.ProductLinks.Where(x => x.LinkType == ProductLinkType.CrossSell))
+            {
+                if (model.Product.CrossSellProducts.All(x => x.Id != productLink.LinkedProductId))
                 {
                     _productLinkRepository.Remove(productLink);
                 }
@@ -710,7 +762,7 @@ namespace SimplCommerce.Module.Catalog.Controllers
 
         private string SaveFile(IFormFile file)
         {
-            var originalFileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Trim('"');
+            var originalFileName = ContentDispositionHeaderValue.Parse(file.ContentDisposition).FileName.Value.Trim('"');
             var fileName = $"{Guid.NewGuid()}{Path.GetExtension(originalFileName)}";
             _mediaService.SaveMedia(file.OpenReadStream(), fileName, file.ContentType);
             return fileName;

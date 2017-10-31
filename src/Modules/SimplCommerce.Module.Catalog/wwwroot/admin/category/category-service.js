@@ -11,7 +11,9 @@
             createCategory: createCategory,
             editCategory: editCategory,
             deleteCategory: deleteCategory,
-            getCategories: getCategories
+            getCategories: getCategories,
+            getProducts: getProducts,
+            saveProduct: saveProduct
         };
         return service;
 
@@ -23,14 +25,14 @@
             return $http.get('api/categories');
         }
 
-        function createCategory(category, thumbnailImage) {
+        function createCategory(category) {
             return Upload.upload({
                 url: 'api/categories',
                 data: category
             });
         }
 
-        function editCategory(category, thumbnailImage) {
+        function editCategory(category) {
             return Upload.upload({
                 url: 'api/categories/' + category.id,
                 method: 'PUT',
@@ -40,6 +42,14 @@
 
         function deleteCategory(category) {
             return $http.delete('api/categories/' + category.id);
+        }
+
+        function getProducts(id, params) {
+            return $http.post('api/categories/'+ id +'/products', params);
+        }
+
+        function saveProduct(product) {
+            return $http.put('api/categories/update-product/' + product.id, product);
         }
     }
 })();

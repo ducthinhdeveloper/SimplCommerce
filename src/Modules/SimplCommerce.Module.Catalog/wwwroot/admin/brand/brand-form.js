@@ -5,11 +5,16 @@
         .controller('BrandFormCtrl', BrandFormCtrl);
 
     /* @ngInject */
-    function BrandFormCtrl($state, $stateParams, brandService) {
+    function BrandFormCtrl($state, $stateParams, brandService, translateService) {
         var vm = this;
+        vm.translate = translateService;
         vm.brand = {};
         vm.brandId = $stateParams.id;
         vm.isEditMode = vm.brandId > 0;
+
+        vm.updateSlug = function () {
+            vm.brand.slug = slugify(vm.brand.name);
+        };
 
         vm.save = function save() {
             var promise;

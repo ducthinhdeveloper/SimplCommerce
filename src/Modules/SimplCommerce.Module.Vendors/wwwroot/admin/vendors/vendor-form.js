@@ -5,11 +5,16 @@
         .controller('VendorFormCtrl', VendorFormCtrl);
 
     /* @ngInject */
-    function VendorFormCtrl($state, $stateParams, vendorService) {
+    function VendorFormCtrl($state, $stateParams, vendorService, translateService) {
         var vm = this;
+        vm.translate = translateService;
         vm.vendor = {};
         vm.vendorId = $stateParams.id;
         vm.isEditMode = vm.vendorId > 0;
+
+        vm.updateSlug = function () {
+            vm.vendor.slug = slugify(vm.vendor.name);
+        };
 
         vm.save = function save() {
             var promise;

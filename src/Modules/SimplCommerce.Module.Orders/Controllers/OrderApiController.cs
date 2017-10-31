@@ -40,7 +40,6 @@ namespace SimplCommerce.Module.Orders.Controllers
 
             var query = _orderRepository
                 .Query()
-                .Include(x => x.CreatedBy)
                 .Where(x => x.OrderStatus == orderStatus);
 
             var currentUser = await _workContext.GetCurrentUser();
@@ -65,8 +64,7 @@ namespace SimplCommerce.Module.Orders.Controllers
         public async Task<ActionResult> List([FromBody] SmartTableParam param)
         {
             IQueryable<Order> query = _orderRepository
-                .Query()
-                .Include(x => x.CreatedBy);
+                .Query();
 
             var currentUser = await _workContext.GetCurrentUser();
             if (!User.IsInRole("admin"))
@@ -152,7 +150,9 @@ namespace SimplCommerce.Module.Orders.Controllers
                 OrderStatus = (int) order.OrderStatus,
                 OrderStatusString = order.OrderStatus.ToString(),
                 CustomerName = order.CreatedBy.FullName,
-                SubTotal = order.SubTotal,
+                Subtotal = order.SubTotal,
+                Discount = order.Discount,
+                SubTotalWithDiscount = order.SubTotalWithDiscount,
                 ShippingAddress = new ShippingAddressVm
                 {
                     AddressLine1 = order.ShippingAddress.AddressLine1,

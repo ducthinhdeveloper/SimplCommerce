@@ -13,17 +13,7 @@ namespace SimplCommerce.WebHost.Extensions
     {
         public static IApplicationBuilder UseCustomizedIdentity(this IApplicationBuilder app)
         {
-            app.UseIdentity()
-                .UseGoogleAuthentication(new GoogleOptions
-                {
-                    ClientId = "583825788849-8g42lum4trd5g3319go0iqt6pn30gqlq.apps.googleusercontent.com",
-                    ClientSecret = "X8xIiuNEUjEYfiEfiNrWOfI4"
-                })
-                .UseFacebookAuthentication(new FacebookOptions
-                {
-                    AppId = "1716532045292977",
-                    AppSecret = "dfece01ae919b7b8af23f962a1f87f95"
-                });
+            app.UseAuthentication();
             return app;
         }
 
@@ -44,12 +34,12 @@ namespace SimplCommerce.WebHost.Extensions
         {
             if (env.IsDevelopment())
             {
-                app.UseStaticFiles(new StaticFileOptions()
+                app.UseStaticFiles(new StaticFileOptions
                 {
                     OnPrepareResponse = (context) =>
                     {
                         var headers = context.Context.Response.GetTypedHeaders();
-                        headers.CacheControl = new CacheControlHeaderValue()
+                        headers.CacheControl = new CacheControlHeaderValue
                         {
                             NoCache = true,
                             NoStore = true,
@@ -60,12 +50,12 @@ namespace SimplCommerce.WebHost.Extensions
             }
             else
             {
-                app.UseStaticFiles(new StaticFileOptions()
+                app.UseStaticFiles(new StaticFileOptions
                 {
                     OnPrepareResponse = (context) =>
                     {
                         var headers = context.Context.Response.GetTypedHeaders();
-                        headers.CacheControl = new CacheControlHeaderValue()
+                        headers.CacheControl = new CacheControlHeaderValue
                         {
                             Public = true,
                             MaxAge = TimeSpan.FromDays(60)
@@ -87,7 +77,9 @@ namespace SimplCommerce.WebHost.Extensions
                 new CultureInfo("pt-BR"),
                 new CultureInfo("uk-UA"),
                 new CultureInfo("ru-RU"),
-                new CultureInfo("ar-TN")
+                new CultureInfo("ar-TN"),
+                new CultureInfo("ko-KR"),
+                new CultureInfo("tr-TR")
             };
             app.UseRequestLocalization(new RequestLocalizationOptions
             {
